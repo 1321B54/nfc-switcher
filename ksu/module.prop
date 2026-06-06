@@ -2,5 +2,5 @@ id=nfc_switch
 name=NFC自动切换
 version=v3.0
 versionCode=3
-author=XiaoLongXia
+author=1321B54
 description=LSPosed检测+KSU执行 100ms延迟 零后台耗电
