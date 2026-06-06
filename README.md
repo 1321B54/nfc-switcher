@@ -102,4 +102,4 @@ public class ModuleMain extends XposedModule {
 
 ## 许可
 
-MIT © 1321B54 🦞
+MIT © 1321B54 
