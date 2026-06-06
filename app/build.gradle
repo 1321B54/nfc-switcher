@@ -1,0 +1,29 @@
+plugins {
+    id("com.android.application")
+}
+android {
+    namespace = "com.xiaolongxia.nfcswitch"
+    compileSdk = 36
+    defaultConfig {
+        applicationId = "com.xiaolongxia.nfcswitch"
+        minSdk = 29
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0"
+    }
+    buildTypes { release { minifyEnabled = false } }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    packaging {
+        resources {
+            merges += "META-INF/xposed/*"
+        }
+    }
+}
+dependencies {
+    compileOnly(files("/tmp/libxposed/classes.jar"))
+    implementation(files("/tmp/lsp_service/classes.jar"))
+    implementation(files("/tmp/lsp_iface/classes.jar"))
+}
