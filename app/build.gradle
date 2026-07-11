@@ -8,8 +8,8 @@ android {
         applicationId = "com.xiaolongxia.nfcswitch"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 6
+        versionName = "3.3"
     }
     buildTypes { release { minifyEnabled = false } }
     compileOptions {
