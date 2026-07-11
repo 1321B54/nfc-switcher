@@ -4,3 +4,4 @@ version=v3.3
 versionCode=6
 author=1321B54
 description=LSPosed检测+inotify事件驱动，低功耗可靠回切
+updateJson=https://raw.githubusercontent.com/1321B54/nfc-switcher/main/ksu/update.json

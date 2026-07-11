@@ -1,3 +1,4 @@
 minApiVersion=101
 targetApiVersion=101
 staticScope=true
+updateJson=https://raw.githubusercontent.com/1321B54/nfc-switcher/main/update.json
