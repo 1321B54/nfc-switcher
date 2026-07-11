@@ -1,27 +1,21 @@
-## v3.3.1 (2026-07-11)
-
-**修复：** KSU 时间戳单位不匹配导致 G 信号被误判过期
-- KSU 端 is_recent() 正确处理毫秒→秒转换
-- 增加 KSU su fallback 处理 settings put 权限问题
-
 # 更新日志
 
+## v3.4 (2026-07-11)
+
+**修复：** KSU 时间戳 Bug 彻底根除
+- 移除信号文件中的时间戳依赖（`/proc/uptime` 与 `SystemClock.elapsedRealtime()` 时钟源不一致，手机睡眠后差值可达数小时）
+- 重构为 inotifyd 事件驱动 + 独立 watchdog 架构
+- 信号文件只读首字母 `G`/`X`，兼容新旧格式
+- Watchdog 只做 uptime 差值比较（同一时钟源，不受睡眠影响）
+- 简化 `apply` 逻辑，去掉无效的 su fallback
+
 ## v3.3 (2026-07-11)
+- 生命周期 hook 改为 onStart/onStop
+- 15 秒支付宽限期 + 5 秒心跳
+- inotifyd 事件驱动 KSU 模块
 
-**修复：** Google Wallet 支付时被小米钱包误抢占
-- 生命周期 hook 从 onResume/onPause 改为 onStart/onStop，避免支付动画或 TapAndPay 界面接管时提前回切
-- 15 秒支付宽限期 + 5 秒心跳信号
-- Wallet 进程异常退出后由 20 秒 watchdog 自动恢复小米钱包
-
-**优化：**
-- KSU 服务从 100ms 轮询改为 inotify 事件驱动，空闲零 CPU
-- 信号带时间戳 + 事件编号，支持重复打开和异常退出恢复
-- 仅在默认组件不匹配时写入 settings
-
-## v1.1 (之前)
-
+## v1.1
 - 修复杀进程 Bug
 
-## v1.0 (之前)
-
-- 首次发布：LSPosed + KernelSU NFC 自动切换
+## v1.0
+- 首次发布

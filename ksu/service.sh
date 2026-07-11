@@ -1,92 +1,75 @@
 #!/system/bin/sh
+
+# ============================================================
+# NFC 自动切换 — KernelSU 模块 (service.sh)
+# 功能：监听 LSPosed 模块写入的信号文件，切换 NFC 默认支付
+# 架构：inotifyd 事件驱动 + 独立 watchdog
+# ============================================================
+
 GP="com.google.android.gms/com.google.android.gms.tapandpay.hce.service.TpHceService"
 XM="com.android.nfc/com.android.nfc.cardemulation.ESEWalletDummyService"
 SIG="/data/local/tmp/nfc_signal"
+TS_FILE="/data/local/tmp/nfc_watchdog_ts"
 WATCHDOG_TIMEOUT=20
 
-is_recent() {
-  # Signal format: G:12345678  (Java elapsedRealtime, milliseconds)
-  # /proc/uptime returns: seconds.microseconds
-  # Convert both to seconds for comparison
-  local stamp="${1#*:}"
-  local now=$(cut -d. -f1 /proc/uptime)
-  # stamp is in ms, convert to seconds
-  local stamp_s=$((stamp / 1000))
-  local age=$((now - stamp_s))
-  [ "$age" -lt "$WATCHDOG_TIMEOUT" ] 2>/dev/null
-}
-
-apply_action() {
+# ----- 切换 NFC 默认支付 -----
+apply() {
   case "$1" in
     G) TARGET="$GP" ;;
     X) TARGET="$XM" ;;
     *) return ;;
   esac
-  local CURRENT
-  CURRENT=$(settings get secure nfc_payment_default_component 2>/dev/null)
+  CURRENT=$(settings get secure nfc_payment_default_component 2>/dev/null) || return
   [ "$CURRENT" = "$TARGET" ] && return
-  # Try normal settings put; on some ROMs SELinux blocks shell → use KSU su if available
-  settings put secure nfc_payment_default_component "$TARGET" 2>/dev/null && return
-  # Fallback: try through KSU's su (if hidden su binary exists)
-  [ -x /data/adb/ksu/bin/su ] && /data/adb/ksu/bin/su -c "settings put secure nfc_payment_default_component \"$TARGET\"" 2>/dev/null && return
-  # Last resort: write directly to the signal file that KSU root process reads
-  return 1
+  settings put secure nfc_payment_default_component "$TARGET"
 }
 
-expire_google() {
-  local EXPECTED="$1"
-  [ "$(cat "$SIG" 2>/dev/null)" = "$EXPECTED" ] || return
-  local NOW
-  NOW=$(cut -d. -f1 /proc/uptime)
-  printf 'X:%s000' "$NOW" > "$SIG"
-  apply_action X
-}
-
-start_watchdog() {
-  local EVENT="$1"
-  local DELAY="$2"
-  (
-    sleep "$DELAY"
-    "$0" --expire "$EVENT"
-  ) >/dev/null 2>&1 &
-}
-
-handle_signal() {
-  local CMD ACTION STAMP
-  CMD=$(cat "$SIG" 2>/dev/null) || return
-  ACTION="${CMD%%:*}"
-  case "$ACTION" in
-    X) apply_action X; return ;;
-    G) ;;
-    *) return ;;
+# ----- 收到信号事件 -----
+on_signal() {
+  content=$(cat "$SIG" 2>/dev/null) || return
+  action="${content:0:1}"
+  case "$action" in
+    G)
+      apply "G"
+      # 记录当前 uptime（秒），只给 watchdog 做差值比较
+      uptime_raw=$(cat /proc/uptime 2>/dev/null) || return
+      printf '%s' "${uptime_raw%%.*}" > "$TS_FILE"
+      ;;
+    X)
+      apply "X"
+      ;;
   esac
-  # G signal: check if recent
-  STAMP="${CMD#*:}"
-  if [ -z "$STAMP" ] || ! is_recent "$CMD"; then
-    # Stale or unparseable → expire to Xiaomi
-    expire_google "$CMD"
-    return
-  fi
-  apply_action G
-  # Start watchdog: remaining time until expiry
-  local now_s=$(cut -d. -f1 /proc/uptime)
-  local stamp_s=$((STAMP / 1000))
-  local age=$((now_s - stamp_s))
-  local delay=$((WATCHDOG_TIMEOUT - age))
-  [ "$delay" -gt 0 ] && start_watchdog "$CMD" "$delay"
 }
 
-if [ "$1" = "--expire" ]; then
-  expire_google "$2"
-  exit 0
-fi
+# 首次处理（模块刚加载时已有信号内容的情况）
+on_signal
 
+# 如果被 inotifyd 触发（有参数）→ 处理完退出
 if [ -n "$1" ]; then
-  handle_signal
   exit 0
 fi
 
-touch "$SIG"
-chmod 666 "$SIG"
-handle_signal
-exec busybox inotifyd "$0" "$SIG:w"
+# ===== 主进程 =====
+# inotifyd 后台监听写事件
+busybox inotifyd "$0" "$SIG:w" &
+INOTIFY_PID=$!
+
+# watchdog 主循环：只检查 G 信号超时
+# 用 /proc/uptime 做差值（同一时钟源，手机睡眠不影响）
+while true; do
+  sleep 5
+
+  content=$(cat "$SIG" 2>/dev/null) || continue
+  action="${content:0:1}"
+  [ "$action" != "G" ] && continue
+
+  ts=$(cat "$TS_FILE" 2>/dev/null) || continue
+  uptime_now=$(cat /proc/uptime 2>/dev/null) || continue
+  ts_now="${uptime_now%%.*}"
+  age=$((ts_now - ts))
+
+  if [ "$age" -ge "$WATCHDOG_TIMEOUT" ]; then
+    printf 'X' > "$SIG"
+    apply "X"
+  fi
+done
