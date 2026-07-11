@@ -1,7 +1,7 @@
 id=nfc_switch
 name=NFC自动切换
-version=v3.3
-versionCode=6
+version=v3.3.1
+versionCode=7
 author=1321B54
 description=LSPosed检测+inotify事件驱动，低功耗可靠回切
 updateJson=https://raw.githubusercontent.com/1321B54/nfc-switcher/main/ksu/update.json
